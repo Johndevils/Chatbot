@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Free AI Chat – OpenRouter</title>
+  
+  <!-- Tailwind CSS v3.4+ via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          },
+          animation: {
+            'pulse-slow': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'bounce-slow': 'bounce 1.5s infinite'
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Marked.js for Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  
+  <!-- Custom styles -->
+  <style>
+    /* Smooth scrolling */
+    html { scroll-behavior: smooth; }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { 
+      background: rgba(156, 163, 175, 0.5); 
+      border-radius: 4px; 
+    }
+    ::-webkit-scrollbar-thumb:hover { 
+      background: rgba(156, 163, 175, 0.7); 
+    }    .dark ::-webkit-scrollbar-thumb { 
+      background: rgba(75, 85, 99, 0.6); 
+    }
+    .dark ::-webkit-scrollbar-thumb:hover { 
+      background: rgba(75, 85, 99, 0.8); 
+    }
+    
+    /* Auto-growing textarea */
+    textarea {
+      field-sizing: content;
+      min-height: 24px;
+      max-height: 144px;
+      resize: none;
+      overflow-y: auto;
+    }
+    
+    /* Markdown content styles */
+    .markdown-body {
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+    .markdown-body p { margin: 0.5rem 0; }
+    .markdown-body p:first-child { margin-top: 0; }
+    .markdown-body p:last-child { margin-bottom: 0; }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 { 
+      margin: 1rem 0 0.5rem; font-weight: 600; 
+    }
+    .markdown-body ul, .markdown-body ol { 
+      margin: 0.5rem 0; padding-left: 1.5rem; 
+    }
+    .markdown-body li { margin: 0.25rem 0; }
+    .markdown-body code {
+      background: rgba(156, 163, 175, 0.15);
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.9em;
+    }
+    .dark .markdown-body code {
+      background: rgba(75, 85, 99, 0.4);
+    }
+    .markdown-body pre {
+      background: #1e293b;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin: 0.75rem 0;
+      overflow-x: auto;
+      position: relative;
+    }
+    .dark .markdown-body pre {      background: #0f172a;
+    }
+    .markdown-body pre code {
+      background: transparent;
+      padding: 0;
+      color: #e2e8f0;
+      font-size: 0.875rem;
+    }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.75rem 0;
+    }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid rgba(156, 163, 175, 0.3);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    .dark .markdown-body th, .dark .markdown-body td {
+      border-color: rgba(75, 85, 99, 0.5);
+    }
+    .markdown-body th {
+      background: rgba(156, 163, 175, 0.1);
+      font-weight: 600;
+    }
+    .dark .markdown-body th {
+      background: rgba(75, 85, 99, 0.3);
+    }
+    .markdown-body a {
+      color: #4f46e5;
+      text-decoration: none;
+    }
+    .markdown-body a:hover { text-decoration: underline; }
+    .dark .markdown-body a { color: #818cf8; }
+    
+    /* Copy button for code blocks */
+    .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      background: rgba(156, 163, 175, 0.2);
+      border: none;
+      border-radius: 0.25rem;
+      color: #94a3b8;
+      font-size: 0.75rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.2s, background 0.2s;
+    }    .markdown-body pre:hover .copy-btn { opacity: 1; }
+    .copy-btn:hover {
+      background: rgba(156, 163, 175, 0.4);
+      color: #e2e8f0;
+    }
+    .copy-btn.copied {
+      background: #22c55e;
+      color: white;
+    }
+    
+    /* Streaming indicator */
+    .typing-indicator span {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: currentColor;
+      border-radius: 50%;
+      margin: 0 1px;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+    
+    /* Fade animations */
+    .message-enter {
+      animation: fadeInUp 0.3s ease-out;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Error message styling */
+    .error-toast {
+      animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 4.7s forwards;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-200">  
+  <!-- Top Bar -->
+  <header class="sticky top-0 z-50 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-700 px-4 py-3">
+    <div class="max-w-4xl mx-auto flex items-center justify-between gap-3">
+      <!-- App Name -->
+      <h1 class="text-lg font-bold bg-gradient-to-r from-primary-600 to-indigo-500 bg-clip-text text-transparent whitespace-nowrap">
+        Free AI Chat – OpenRouter
+      </h1>
+      
+      <!-- Center: Model Selector -->
+      <div class="flex-1 max-w-md mx-4">
+        <select id="model-select" class="w-full px-3 py-2 text-sm bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 dark:focus:ring-primary-400 transition">
+          <option value="stepfun/step-3.5-flash:free" selected>Step 3.5 Flash (free, 256K ctx, fast & strong)</option>
+          <option value="arcee-ai/trinity-large-preview:free">Trinity Large (free, MoE, excellent reasoning)</option>
+          <option value="nvidia/nemotron-3-nano-30b-a3b:free">Nemotron 3 Nano (free, efficient MoE)</option>
+          <option value="qwen/qwen3-next-80b-a3b-instruct:free">Qwen3 Next 80B (free, powerful)</option>
+          <option value="qwen/qwen3-coder:free">Qwen3 Coder (free, 480B MoE coding)</option>
+          <option value="qwen/qwen3.5-9b:free">Qwen3.5 9B (free, quick & capable)</option>
+          <option value="qwen/qwen3.5-flash:free">Qwen3.5 Flash (free, speedy variant)</option>
+          <option value="openrouter/free">OpenRouter Free (random model)</option>
+          <option value="liquid/lfm-2.5-1.2b-instruct:free">LFM 2.5 1.2B (free, lightweight & fast)</option>
+        </select>
+      </div>
+      
+      <!-- Right: Controls -->
+      <div class="flex items-center gap-2">
+        <!-- Theme Toggle -->
+        <button id="theme-toggle" class="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors" title="Toggle theme" aria-label="Toggle dark mode">
+          <span id="theme-icon" class="text-xl">🌙</span>
+        </button>
+        
+        <!-- New Chat -->
+        <button id="new-chat-btn" class="px-3 py-2 text-sm font-medium bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 rounded-lg transition-colors flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          New Chat
+        </button>
+      </div>
+    </div>
+  </header>
+  
+  <!-- API Key Banner (shown if missing) -->
+  <div id="api-key-banner" class="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 px-4 py-2 hidden">
+    <div class="max-w-4xl mx-auto flex items-center justify-between gap-3 text-sm">
+      <p class="text-amber-800 dark:text-amber-200">
+        ⚠️ Please enter your OpenRouter API key to start chatting. 
+        <a href="https://openrouter.ai/keys" target="_blank" class="underline hover:text-amber-900 dark:hover:text-amber-100">Get a free key</a>
+      </p>
+      <button id="show-api-key-input" class="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md transition text-xs font-medium">        Enter Key
+      </button>
+    </div>
+  </div>
+  
+  <!-- API Key Modal -->
+  <div id="api-key-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
+    <div class="bg-white dark:bg-slate-800 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl border border-gray-200 dark:border-slate-700">
+      <h3 class="text-lg font-semibold mb-4">Enter OpenRouter API Key</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        Get your free API key at <a href="https://openrouter.ai/keys" target="_blank" class="text-primary-600 dark:text-primary-400 underline">openrouter.ai/keys</a>
+      </p>
+      <input 
+        type="password" 
+        id="api-key-input" 
+        placeholder="sk-or-v1-..." 
+        class="w-full px-4 py-3 bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4 font-mono text-sm"
+        autocomplete="off"
+      />
+      <div class="flex justify-end gap-2">
+        <button id="cancel-api-key" class="px-4 py-2 text-sm bg-gray-200 dark:bg-slate-700 hover:bg-gray-300 dark:hover:bg-slate-600 rounded-lg transition">Cancel</button>
+        <button id="save-api-key" class="px-4 py-2 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition font-medium">Save & Continue</button>
+      </div>
+      <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+        🔒 Your key is stored locally in your browser and never sent to any server except OpenRouter.
+      </p>
+    </div>
+  </div>
+  
+  <!-- Chat Container -->
+  <main id="chat-container" class="flex-1 overflow-y-auto px-4 py-6">
+    <div id="messages" class="max-w-4xl mx-auto space-y-4">
+      <!-- Welcome message -->
+      <div id="welcome-message" class="text-center py-12 px-4">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary-500 to-indigo-600 text-white text-2xl mb-4 shadow-lg">
+          ✨
+        </div>
+        <h2 class="text-xl font-semibold mb-2">Welcome! 👋</h2>
+        <p class="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+          Pick a free model and start chatting — zero cost! 
+          <br class="hidden sm:inline"/>Type a message below to begin.
+        </p>
+      </div>
+      <!-- Messages will be inserted here -->
+    </div>
+  </main>
+  
+  <!-- Input Area -->
+  <footer class="sticky bottom-0 z-40 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border-t border-gray-200 dark:border-slate-700 px-4 py-4">
+    <div class="max-w-4xl mx-auto">      <div class="flex items-end gap-3 bg-gray-100 dark:bg-slate-700/50 rounded-2xl p-3 border border-gray-200 dark:border-slate-600 focus-within:ring-2 focus-within:ring-primary-500 dark:focus-within:ring-primary-400 transition">
+        <textarea 
+          id="user-input" 
+          placeholder="Type your message... (Shift+Enter for new line)" 
+          class="flex-1 bg-transparent border-none outline-none resize-none text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 px-1 py-2 max-h-36"
+          rows="1"
+        ></textarea>
+        <button 
+          id="send-btn" 
+          class="p-3 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl transition-colors flex-shrink-0 shadow-md hover:shadow-lg"
+          title="Send message"
+          aria-label="Send message"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+          </svg>
+        </button>
+      </div>
+      <p class="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
+        Powered by OpenRouter • Free models only • Messages sent to OpenRouter API
+      </p>
+    </div>
+  </footer>
+  
+  <!-- Toast Container for Errors -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2 max-w-sm"></div>
+  
+  <!-- JavaScript -->
+  <script>
+    // ============ CONFIG ============
+    const API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+    const DEFAULT_MODEL = 'stepfun/step-3.5-flash:free';
+    
+    // ============ STATE ============
+    let apiKey = localStorage.getItem('openrouter_api_key') || '';
+    let messages = []; // [{role, content}]
+    let currentModel = DEFAULT_MODEL;
+    let isStreaming = false;
+    let isDarkMode = localStorage.getItem('theme') === 'dark' || 
+                     (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    
+    // ============ DOM ELEMENTS ============
+    const elements = {
+      themeToggle: document.getElementById('theme-toggle'),
+      themeIcon: document.getElementById('theme-icon'),
+      modelSelect: document.getElementById('model-select'),
+      newChatBtn: document.getElementById('new-chat-btn'),
+      apiKeyBanner: document.getElementById('api-key-banner'),
+      apiKeyModal: document.getElementById('api-key-modal'),
+      apiKeyInput: document.getElementById('api-key-input'),      showApiKeyInput: document.getElementById('show-api-key-input'),
+      saveApiKeyBtn: document.getElementById('save-api-key'),
+      cancelApiKeyBtn: document.getElementById('cancel-api-key'),
+      messagesContainer: document.getElementById('messages'),
+      welcomeMessage: document.getElementById('welcome-message'),
+      userInput: document.getElementById('user-input'),
+      sendBtn: document.getElementById('send-btn'),
+      toastContainer: document.getElementById('toast-container'),
+      chatContainer: document.getElementById('chat-container')
+    };
+    
+    // ============ INITIALIZATION ============
+    function init() {
+      // Apply theme
+      applyTheme(isDarkMode);
+      
+      // Load API key state
+      updateApiKeyUI();
+      
+      // Load saved model preference
+      const savedModel = localStorage.getItem('preferred_model');
+      if (savedModel && elements.modelSelect.querySelector(`[value="${savedModel}"]`)) {
+        elements.modelSelect.value = savedModel;
+        currentModel = savedModel;
+      }
+      
+      // Load conversation history
+      const savedMessages = localStorage.getItem('chat_messages');
+      if (savedMessages) {
+        messages = JSON.parse(savedMessages);
+        if (messages.length > 0) {
+          elements.welcomeMessage.style.display = 'none';
+          messages.forEach(msg => appendMessageToDOM(msg.role, msg.content, false));
+          scrollToBottom();
+        }
+      }
+      
+      // Setup event listeners
+      setupEventListeners();
+      
+      // Configure marked.js
+      configureMarked();
+    }
+    
+    // ============ THEME MANAGEMENT ============
+    function applyTheme(dark) {
+      if (dark) {
+        document.documentElement.classList.add('dark');
+        elements.themeIcon.textContent = '🌙';
+      } else {        document.documentElement.classList.remove('dark');
+        elements.themeIcon.textContent = '🌞';
+      }
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+    }
+    
+    function toggleTheme() {
+      isDarkMode = !isDarkMode;
+      applyTheme(isDarkMode);
+    }
+    
+    // ============ API KEY MANAGEMENT ============
+    function updateApiKeyUI() {
+      if (!apiKey) {
+        elements.apiKeyBanner.classList.remove('hidden');
+      } else {
+        elements.apiKeyBanner.classList.add('hidden');
+      }
+    }
+    
+    function saveApiKey() {
+      const key = elements.apiKeyInput.value.trim();
+      if (key && key.startsWith('sk-or-')) {
+        apiKey = key;
+        localStorage.setItem('openrouter_api_key', key);
+        elements.apiKeyModal.classList.add('hidden');
+        elements.apiKeyInput.value = '';
+        updateApiKeyUI();
+        showToast('✅ API key saved!', 'success');
+      } else {
+        showToast('⚠️ Please enter a valid OpenRouter API key (starts with sk-or-)', 'error');
+        elements.apiKeyInput.classList.add('border-red-500', 'ring-red-500');
+        setTimeout(() => elements.apiKeyInput.classList.remove('border-red-500', 'ring-red-500'), 2000);
+      }
+    }
+    
+    function showApiKeyModal() {
+      elements.apiKeyModal.classList.remove('hidden');
+      elements.apiKeyInput.focus();
+    }
+    
+    // ============ EVENT LISTENERS ============
+    function setupEventListeners() {
+      // Theme toggle
+      elements.themeToggle.addEventListener('click', toggleTheme);
+      
+      // Model selector
+      elements.modelSelect.addEventListener('change', (e) => {
+        currentModel = e.target.value;
+        localStorage.setItem('preferred_model', currentModel);      });
+      
+      // New chat
+      elements.newChatBtn.addEventListener('click', () => {
+        if (isStreaming) return;
+        if (confirm('Start a new chat? Current conversation will be cleared.')) {
+          messages = [];
+          localStorage.removeItem('chat_messages');
+          elements.messagesContainer.innerHTML = '';
+          elements.messagesContainer.appendChild(elements.welcomeMessage);
+          elements.welcomeMessage.style.display = 'block';
+          showToast('🗑️ Chat cleared', 'info');
+        }
+      });
+      
+      // API key modal controls
+      elements.showApiKeyInput.addEventListener('click', showApiKeyModal);
+      elements.saveApiKeyBtn.addEventListener('click', saveApiKey);
+      elements.cancelApiKeyBtn.addEventListener('click', () => {
+        elements.apiKeyModal.classList.add('hidden');
+        elements.apiKeyInput.value = '';
+      });
+      elements.apiKeyModal.addEventListener('click', (e) => {
+        if (e.target === elements.apiKeyModal) {
+          elements.apiKeyModal.classList.add('hidden');
+          elements.apiKeyInput.value = '';
+        }
+      });
+      
+      // Auto-grow textarea
+      elements.userInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 144) + 'px';
+      });
+      
+      // Send on Enter (Shift+Enter for newline)
+      elements.userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSend();
+        }
+      });
+      
+      // Send button
+      elements.sendBtn.addEventListener('click', handleSend);
+      
+      // Close modal on Escape
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !elements.apiKeyModal.classList.contains('hidden')) {
+          elements.apiKeyModal.classList.add('hidden');          elements.apiKeyInput.value = '';
+        }
+      });
+    }
+    
+    // ============ MARKED.JS CONFIGURATION ============
+    function configureMarked() {
+      marked.setOptions({
+        breaks: true,
+        gfm: true,
+        highlight: function(code, lang) {
+          // Basic syntax highlighting placeholder (could add prism.js later)
+          return code;
+        }
+      });
+      
+      // Add copy button to code blocks after render
+      const originalRenderer = marked.Renderer.prototype.code;
+      marked.Renderer.prototype.code = function(code, lang) {
+        const escapedCode = code.replace(/`/g, '\\`').replace(/\$/g, '\\$');
+        const langLabel = lang || 'code';
+        return `<pre><button class="copy-btn" onclick="copyCode(this)">📋 Copy</button><code class="language-${langLabel}">${escapedCode}</code></pre>`;
+      };
+    }
+    
+    // Global function for copy button (must be global for onclick)
+    window.copyCode = function(btn) {
+      const code = btn.nextElementSibling.textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(() => {
+        showToast('Failed to copy code', 'error');
+      });
+    };
+    
+    // ============ MESSAGE HANDLING ============
+    function appendMessageToDOM(role, content, animate = true) {
+      elements.welcomeMessage.style.display = 'none';
+      
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} message-enter`;
+      if (animate) messageDiv.style.animation = 'fadeInUp 0.3s ease-out';
+      
+      const bubbleClass = role === 'user'         ? 'bg-primary-600 text-white rounded-2xl rounded-tr-sm' 
+        : 'bg-gray-200 dark:bg-slate-700 text-gray-900 dark:text-gray-100 rounded-2xl rounded-tl-sm';
+      
+      const avatar = role === 'assistant' 
+        ? `<div class="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-sm font-bold mr-2 shadow">AI</div>`
+        : '';
+      
+      const contentClass = role === 'assistant' ? 'markdown-body' : 'whitespace-pre-wrap';
+      const renderedContent = role === 'assistant' ? marked.parse(content) : escapeHtml(content);
+      
+      messageDiv.innerHTML = `
+        ${role === 'assistant' ? avatar : ''}
+        <div class="max-w-[85%] sm:max-w-[75%] ${bubbleClass} px-4 py-3 shadow-sm">
+          <div class="${contentClass} text-sm leading-relaxed">${renderedContent}</div>
+        </div>
+      `;
+      
+      elements.messagesContainer.appendChild(messageDiv);
+      
+      // Add copy buttons to code blocks
+      if (role === 'assistant') {
+        messageDiv.querySelectorAll('pre').forEach(pre => {
+          const btn = pre.querySelector('.copy-btn');
+          if (btn) {
+            btn.onclick = function() { window.copyCode(this); };
+          }
+        });
+      }
+      
+      scrollToBottom();
+      return messageDiv;
+    }
+    
+    function appendStreamingContent(element, content) {
+      // For streaming, we append raw text and re-render markdown periodically
+      // For performance, we batch updates
+      const currentText = element.dataset.streamContent || '';
+      element.dataset.streamContent = currentText + content;
+      
+      // Throttle markdown rendering
+      if (!element._renderTimeout) {
+        element._renderTimeout = setTimeout(() => {
+          element.innerHTML = marked.parse(element.dataset.streamContent);
+          // Re-attach copy buttons
+          element.querySelectorAll('pre').forEach(pre => {
+            if (!pre.querySelector('.copy-btn')) {
+              const btn = document.createElement('button');
+              btn.className = 'copy-btn';
+              btn.textContent = '📋 Copy';
+              btn.onclick = function() { window.copyCode(this); };              pre.insertBefore(btn, pre.firstChild);
+            }
+          });
+          element._renderTimeout = null;
+          scrollToBottom();
+        }, 50);
+      }
+    }
+    
+    function showTypingIndicator() {
+      const indicator = document.createElement('div');
+      indicator.id = 'typing-indicator';
+      indicator.className = 'flex justify-start';
+      indicator.innerHTML = `
+        <div class="flex items-center">
+          <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white text-sm font-bold mr-2 shadow">AI</div>
+          <div class="bg-gray-200 dark:bg-slate-700 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+            <div class="typing-indicator text-gray-500 dark:text-gray-400">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      `;
+      elements.messagesContainer.appendChild(indicator);
+      scrollToBottom();
+      return indicator;
+    }
+    
+    function removeTypingIndicator() {
+      const indicator = document.getElementById('typing-indicator');
+      if (indicator) indicator.remove();
+    }
+    
+    // ============ STREAMING API CALL ============
+    async function handleSend() {
+      const input = elements.userInput.value.trim();
+      if (!input || isStreaming) return;
+      
+      if (!apiKey) {
+        showApiKeyModal();
+        showToast('⚠️ API key required', 'warning');
+        return;
+      }
+      
+      // Add user message
+      messages.push({ role: 'user', content: input });
+      appendMessageToDOM('user', input);
+      saveMessages();
+      
+      // Clear input      elements.userInput.value = '';
+      elements.userInput.style.height = 'auto';
+      elements.sendBtn.disabled = true;
+      isStreaming = true;
+      
+      // Show typing indicator
+      const typingIndicator = showTypingIndicator();
+      
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.origin,
+            'X-Title': 'Free AI Chat – OpenRouter'
+          },
+          body: JSON.stringify({
+            model: currentModel,
+            messages: messages,
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 4096
+          })
+        });
+        
+        if (!response.ok) {
+          let errorText = await response.text();
+          let errorMsg = `API Error ${response.status}`;
+          
+          try {
+            const errorJson = JSON.parse(errorText);
+            if (errorJson.error?.message) errorMsg = errorJson.error.message;
+          } catch {}
+          
+          if (response.status === 401) {
+            errorMsg = 'Invalid API key. Please check your key in settings.';
+            localStorage.removeItem('openrouter_api_key');
+            apiKey = '';
+            updateApiKeyUI();
+          } else if (response.status === 429) {
+            errorMsg = 'Rate limit exceeded. Please wait a moment and try again.';
+          } else if (response.status === 402) {
+            errorMsg = 'Insufficient credits. This model may require payment.';
+          }
+          
+          throw new Error(errorMsg);
+        }
+        
+        // Remove typing indicator once streaming starts        removeTypingIndicator();
+        
+        // Create assistant message container
+        const assistantDiv = appendMessageToDOM('assistant', '');
+        const contentDiv = assistantDiv.querySelector('.markdown-body');
+        contentDiv.dataset.streamContent = '';
+        
+        // Handle streaming response
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let fullContent = '';
+        
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n').filter(line => line.trim());
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const dataStr = line.slice(6);
+              if (dataStr === '[DONE]') continue;
+              
+              try {
+                const data = JSON.parse(dataStr);
+                const delta = data.choices?.[0]?.delta?.content;
+                if (delta) {
+                  fullContent += delta;
+                  appendStreamingContent(contentDiv, delta);
+                }
+              } catch (e) {
+                console.warn('Parse error:', e, dataStr);
+              }
+            }
+          }
+        }
+        
+        // Final render
+        contentDiv.innerHTML = marked.parse(fullContent);
+        contentDiv.querySelectorAll('pre').forEach(pre => {
+          if (!pre.querySelector('.copy-btn')) {
+            const btn = document.createElement('button');
+            btn.className = 'copy-btn';
+            btn.textContent = '📋 Copy';
+            btn.onclick = function() { window.copyCode(this); };
+            pre.insertBefore(btn, pre.firstChild);
+          }
+        });
+                // Save assistant message
+        messages.push({ role: 'assistant', content: fullContent });
+        saveMessages();
+        
+      } catch (error) {
+        removeTypingIndicator();
+        console.error('Chat error:', error);
+        
+        // Show error in chat
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'flex justify-start';
+        errorDiv.innerHTML = `
+          <div class="max-w-[85%] sm:max-w-[75%] bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-800 text-red-800 dark:text-red-200 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+            <p class="text-sm"><strong>Error:</strong> ${escapeHtml(error.message || 'Unknown error')}</p>
+            <p class="text-xs mt-1 opacity-75">Tip: Check your API key and try again</p>
+          </div>
+        `;
+        elements.messagesContainer.appendChild(errorDiv);
+        showToast('⚠️ ' + (error.message || 'Request failed'), 'error');
+        
+      } finally {
+        isStreaming = false;
+        elements.sendBtn.disabled = false;
+        scrollToBottom();
+        elements.userInput.focus();
+      }
+    }
+    
+    // ============ UTILITIES ============
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    function scrollToBottom() {
+      elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+    }
+    
+    function saveMessages() {
+      try {
+        localStorage.setItem('chat_messages', JSON.stringify(messages));
+      } catch (e) {
+        console.warn('Failed to save messages:', e);
+      }
+    }
+    
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      const colors = {        success: 'bg-emerald-500',
+        error: 'bg-red-500',
+        warning: 'bg-amber-500',
+        info: 'bg-blue-500'
+      };
+      
+      toast.className = `error-toast flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white ${colors[type] || colors.info} max-w-sm`;
+      toast.innerHTML = `
+        <span class="text-lg">${type === 'success' ? '✓' : type === 'error' ? '⚠️' : type === 'warning' ? '⚡' : 'ℹ️'}</span>
+        <span class="text-sm flex-1">${message}</span>
+        <button class="ml-2 hover:opacity-80" onclick="this.parentElement.remove()">✕</button>
+      `;
+      
+      elements.toastContainer.appendChild(toast);
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        if (toast.parentElement) {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(-10px)';
+          setTimeout(() => toast.remove(), 300);
+        }
+      }, 5000);
+    }
+    
+    // ============ START APP ============
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
